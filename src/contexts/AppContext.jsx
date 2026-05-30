@@ -164,8 +164,9 @@ export function AppProvider({ children }) {
         storage.setBudgets(merged.budgets);
         storage.setRecurring(merged.recurring);
       } catch (err) {
-        console.warn('Google Sheets load failed (using localStorage):', err.message);
+        console.error('Google Sheets load failed (using localStorage):', err.message);
         dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: false });
+        dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'warning', message: 'Could not load from Google Sheets: ' + err.message } });
       } finally {
         if (!cancelled) dispatch({ type: 'SET_SYNCING', payload: false });
       }
