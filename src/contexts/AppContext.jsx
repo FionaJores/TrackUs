@@ -131,13 +131,13 @@ export function AppProvider({ children }) {
 
   // --- Google Sheets Sync ---
   const syncTimeoutRef = useRef(null);
-  const pollIntervalRef = useRef(null);
   const isSyncingRef = useRef(false);
   const hasPendingChangesRef = useRef(false);
+  const lastSyncTimeRef = useRef(0);
 
   // Load data from Google Sheets
   const loadFromSheets = useCallback(async (showSyncing = true) => {
-    // Don't poll if we have pending local changes or an active sync
+    // Don't load if we have pending local changes or an active sync
     if (!googleSheetsService.isConfigured() || isSyncingRef.current || hasPendingChangesRef.current) return;
     try {
       if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: true });
@@ -166,7 +166,7 @@ export function AppProvider({ children }) {
       storage.setGoals(payload.goals);
       storage.setBudgets(payload.budgets);
       storage.setRecurring(payload.recurring);
-      setTimeout(() => { loadedRef.current = true; }, 0);
+      setTimeout(() => { loadedRef.current = true; }, 100);
     } catch (err) {
       console.error('Google Sheets load failed:', err.message);
       dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: false });
@@ -175,15 +175,33 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // Load from Sheets on mount and poll every 30 seconds for cross-browser sync
+  // Load from Sheets on mount
+  useEffect(() => {
+    if (!googleSheetsService.isConfigured()) return;
+    loadFromSheets(true);
+  }, [activeAccountId, loadFromSheets]);
+
+  // Refresh from Sheets when tab gets focus (cross-browser sync)
   useEffect(() => {
     if (!googleSheetsService.isConfigured()) return;
 
-    loadFromSheets(true);
-    pollIntervalRef.current = setInterval(() => loadFromSheets(false), 30000);
+    const handleFocus = () => {
+      // Only reload if enough time has passed since last sync (5 seconds)
+      if (Date.now() - lastSyncTimeRef.current > 5000) {
+        loadFromSheets(false);
+      }
+    };
 
-    return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
-  }, [activeAccountId, loadFromSheets]);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') handleFocus();
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [loadFromSheets]);
 
   // Sync to Google Sheets when data changes (debounced)
   useEffect(() => {
@@ -204,12 +222,14 @@ export function AppProvider({ children }) {
           recurring: state.recurring,
         });
         dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
+        hasPendingChangesRef.current = false;
+        lastSyncTimeRef.current = Date.now();
       } catch (err) {
         console.warn('Google Sheets sync failed:', err.message);
+        // Keep hasPendingChangesRef true so poll won't overwrite local data
       } finally {
         dispatch({ type: 'SET_SYNCING', payload: false });
         isSyncingRef.current = false;
-        hasPendingChangesRef.current = false;
       }
     }, 2000); // Debounce 2 seconds
 
