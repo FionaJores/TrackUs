@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react';
 import storage from '../utils/storage';
 import { generateId } from '../utils/constants';
 import { addMonths, format, isBefore, parseISO } from 'date-fns';
 import { useAccount } from './AccountContext';
+import googleSheetsService from '../services/googleSheets';
 
 const AppContext = createContext();
 
@@ -127,6 +128,79 @@ export function AppProvider({ children }) {
   useEffect(() => { if (loadedRef.current) storage.setGoals(state.goals); }, [state.goals]);
   useEffect(() => { if (loadedRef.current) storage.setBudgets(state.budgets); }, [state.budgets]);
   useEffect(() => { if (loadedRef.current) storage.setRecurring(state.recurring); }, [state.recurring]);
+
+  // --- Google Sheets Sync ---
+  const syncTimeoutRef = useRef(null);
+
+  // Load data from Google Sheets on mount (merges with localStorage)
+  useEffect(() => {
+    if (!googleSheetsService.isConfigured()) return;
+    let cancelled = false;
+
+    const loadFromSheets = async () => {
+      try {
+        dispatch({ type: 'SET_SYNCING', payload: true });
+        const sheetData = await googleSheetsService.loadAllData();
+        if (cancelled) return;
+
+        // Use sheet data if it has content; merge with local data
+        const merged = {
+          income: sheetData.income?.length ? sheetData.income : storage.getIncome(),
+          expenses: sheetData.expenses?.length ? sheetData.expenses : storage.getExpenses(),
+          savings: sheetData.savings?.length ? sheetData.savings : storage.getSavings(),
+          goals: sheetData.goals?.length ? sheetData.goals : storage.getGoals(),
+          budgets: sheetData.budgets?.length ? sheetData.budgets : storage.getBudgets(),
+          recurring: sheetData.recurring?.length ? sheetData.recurring : storage.getRecurring(),
+        };
+
+        dispatch({ type: 'LOAD_ALL', payload: merged });
+        dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
+
+        // Also persist sheet data to localStorage for offline access
+        storage.setIncome(merged.income);
+        storage.setExpenses(merged.expenses);
+        storage.setSavings(merged.savings);
+        storage.setGoals(merged.goals);
+        storage.setBudgets(merged.budgets);
+        storage.setRecurring(merged.recurring);
+      } catch (err) {
+        console.warn('Google Sheets load failed (using localStorage):', err.message);
+        dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: false });
+      } finally {
+        if (!cancelled) dispatch({ type: 'SET_SYNCING', payload: false });
+      }
+    };
+
+    loadFromSheets();
+    return () => { cancelled = true; };
+  }, [activeAccountId]);
+
+  // Sync to Google Sheets when data changes (debounced)
+  useEffect(() => {
+    if (!loadedRef.current || !googleSheetsService.isConfigured()) return;
+
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(async () => {
+      try {
+        dispatch({ type: 'SET_SYNCING', payload: true });
+        await googleSheetsService.syncAllData({
+          income: state.income,
+          expenses: state.expenses,
+          savings: state.savings,
+          goals: state.goals,
+          budgets: state.budgets,
+          recurring: state.recurring,
+        });
+        dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
+      } catch (err) {
+        console.warn('Google Sheets sync failed:', err.message);
+      } finally {
+        dispatch({ type: 'SET_SYNCING', payload: false });
+      }
+    }, 2000); // Debounce 2 seconds
+
+    return () => { if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current); };
+  }, [state.income, state.expenses, state.savings, state.goals, state.budgets, state.recurring]);
 
   // Process recurring transactions
   const processRecurring = useCallback(() => {
