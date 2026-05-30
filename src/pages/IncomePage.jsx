@@ -6,7 +6,7 @@ import { PageHeader, Card, Button, Badge, EmptyState } from '../components/commo
 import Modal from '../components/common/Modal';
 import SearchFilter from '../components/common/SearchFilter';
 import IncomeForm from '../components/forms/IncomeForm';
-import { formatCurrency, INCOME_SOURCES } from '../utils/constants';
+import { formatCurrency } from '../utils/constants';
 import { formatDisplayDate } from '../utils/dateHelpers';
 
 export default function IncomePage() {
@@ -33,13 +33,13 @@ export default function IncomePage() {
     }
   };
 
-  const sourceColors = { Salary: 'blue', Freelancing: 'purple', Bonus: 'green', 'Investment Return': 'orange', Gift: 'red', Other: 'gray' };
+  const uniqueSources = [...new Set(state.income.map(i => i.source).filter(Boolean))];
 
   return (
     <div>
       <PageHeader
-        title="Income"
-        subtitle="Track all your income sources"
+        title="Monthly Income"
+        subtitle="Track your monthly income sources"
         action={
           <Button onClick={() => setShowForm(true)}>
             <Plus size={16} /> Add Income
@@ -54,7 +54,7 @@ export default function IncomePage() {
         setFilterMonth={setFilterMonth}
         filterCategory={filterCategory}
         setFilterCategory={setFilterCategory}
-        categories={INCOME_SOURCES}
+        categories={uniqueSources}
         placeholder="Search income..."
       />
 
@@ -82,7 +82,7 @@ export default function IncomePage() {
                 {filteredItems.map(item => (
                   <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                     <td className="px-5 py-3.5 text-sm text-gray-700 dark:text-gray-300">{formatDisplayDate(item.date)}</td>
-                    <td className="px-5 py-3.5"><Badge color={sourceColors[item.source] || 'gray'}>{item.source}</Badge></td>
+                    <td className="px-5 py-3.5"><Badge color="blue">{item.source}</Badge></td>
                     <td className="px-5 py-3.5 text-sm font-semibold text-blue-600 dark:text-blue-400 text-right">{formatCurrency(item.amount)}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-gray-400 max-w-[200px] truncate">{item.notes || '-'}</td>
                     <td className="px-5 py-3.5 text-right">

@@ -13,10 +13,12 @@ import { formatCurrency } from '../utils/constants';
 export default function Dashboard() {
   const {
     monthTotalIncome, monthTotalExpenses, monthTotalSavings,
-    currentBalance, monthSavingsRate, totalSavings,
+    monthSavingsRate, totalSavings,
     expensesByCategory, incomeBySource,
     healthScore, insights, monthlyTrend,
   } = useFinancialData();
+
+  const monthBalance = monthTotalIncome - monthTotalExpenses - monthTotalSavings;
 
   const container = {
     hidden: { opacity: 0 },
@@ -27,12 +29,12 @@ export default function Dashboard() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatCard title="Total Income" value={formatCurrency(monthTotalIncome)} icon={TrendingUp} color="blue" subtitle="This month" />
-        <StatCard title="Total Expenses" value={formatCurrency(monthTotalExpenses)} icon={TrendingDown} color="red" subtitle="This month" />
-        <StatCard title="Total Savings" value={formatCurrency(monthTotalSavings)} icon={PiggyBank} color="green" subtitle="This month" />
-        <StatCard title="Current Balance" value={formatCurrency(currentBalance)} icon={Wallet} color="purple" subtitle="All time" />
+        <StatCard title="Monthly Income" value={formatCurrency(monthTotalIncome)} icon={TrendingUp} color="blue" subtitle="This month" />
+        <StatCard title="Expenses" value={formatCurrency(monthTotalExpenses)} icon={TrendingDown} color="red" subtitle="This month" />
+        <StatCard title="Savings" value={formatCurrency(monthTotalSavings)} icon={PiggyBank} color="green" subtitle="This month" />
+        <StatCard title="Balance" value={formatCurrency(monthBalance)} icon={Wallet} color="purple" subtitle="Income - Expenses - Savings" />
         <StatCard title="Savings Rate" value={`${monthSavingsRate}%`} icon={Percent} color="orange" subtitle="This month" />
-        <StatCard title="Net Worth" value={formatCurrency(totalSavings)} icon={BarChart3} color="green" subtitle="Total saved" />
+        <StatCard title="Total Saved" value={formatCurrency(totalSavings)} icon={BarChart3} color="green" subtitle="All time" />
       </div>
 
       {/* Charts Row 1 */}

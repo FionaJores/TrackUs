@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
 import { Button } from '../common/Card';
-import { INCOME_SOURCES } from '../../utils/constants';
 
 export default function IncomeForm({ onSubmit, initialData = null, onCancel }) {
   const [form, setForm] = useState({
     date: initialData?.date || new Date().toISOString().split('T')[0],
     amount: initialData?.amount || '',
-    source: initialData?.source || 'Salary',
+    source: initialData?.source || '',
     notes: initialData?.notes || '',
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.amount || !form.date) return;
+    if (!form.amount || !form.date || !form.source) return;
     onSubmit(form);
-    if (!initialData) setForm({ date: new Date().toISOString().split('T')[0], amount: '', source: 'Salary', notes: '' });
+    if (!initialData) setForm({ date: new Date().toISOString().split('T')[0], amount: '', source: '', notes: '' });
   };
 
   return (
@@ -45,13 +44,14 @@ export default function IncomeForm({ onSubmit, initialData = null, onCancel }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Source</label>
-          <select
+          <input
+            type="text"
             value={form.source}
             onChange={(e) => setForm({ ...form, source: e.target.value })}
+            placeholder="e.g., Salary, Freelance, Business"
             className="w-full px-3 py-2.5 text-sm rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-gray-900 dark:text-gray-100"
-          >
-            {INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+            required
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>

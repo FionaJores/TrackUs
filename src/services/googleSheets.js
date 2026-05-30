@@ -27,19 +27,19 @@ export const googleSheetsService = {
     }
   },
 
-  async loadAllData() {
+  async loadAllData(accountId) {
     if (!this.isConfigured()) throw new Error('Apps Script URL not configured');
     return await this._fetch(this.getUrl(), {
       method: 'POST',
-      body: JSON.stringify({ action: 'load' }),
+      body: JSON.stringify({ action: 'load', accountId }),
     });
   },
 
-  async syncAllData(data) {
+  async syncAllData(data, accountId) {
     if (!this.isConfigured()) throw new Error('Apps Script URL not configured');
     return await this._fetch(this.getUrl(), {
       method: 'POST',
-      body: JSON.stringify({ action: 'sync', payload: data }),
+      body: JSON.stringify({ action: 'sync', payload: data, accountId }),
     });
   },
 

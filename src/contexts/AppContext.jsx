@@ -142,7 +142,7 @@ export function AppProvider({ children }) {
     if (!googleSheetsService.isConfigured() || isSyncingRef.current || hasPendingChangesRef.current) return;
     try {
       if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: true });
-      const sheetData = await googleSheetsService.loadAllData();
+      const sheetData = await googleSheetsService.loadAllData(activeAccountId);
 
       // Don't overwrite if local changes happened while we were fetching
       if (hasPendingChangesRef.current || isSyncingRef.current) return;
@@ -180,7 +180,7 @@ export function AppProvider({ children }) {
     } finally {
       if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: false });
     }
-  }, [setAccountsFromSheet]);
+  }, [setAccountsFromSheet, activeAccountId]);
 
   // Load from Sheets on mount
   useEffect(() => {
@@ -228,7 +228,7 @@ export function AppProvider({ children }) {
           budgets: state.budgets,
           recurring: state.recurring,
           accounts: accounts,
-        });
+        }, activeAccountId);
         dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
         hasPendingChangesRef.current = false;
         lastSyncTimeRef.current = Date.now();

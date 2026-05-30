@@ -33,9 +33,9 @@ function doPost(e) {
   
   switch (action) {
     case 'load':
-      return loadAllData();
+      return loadAllData(data.accountId);
     case 'sync':
-      return syncAllData(data.payload);
+      return syncAllData(data.payload, data.accountId);
     case 'append':
       return appendToSheet(data.sheet, data.row);
     case 'update':
@@ -51,12 +51,12 @@ function setupSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
   const headers = {
-    'Income': ['ID', 'Date', 'Amount', 'Source', 'Notes', 'CreatedAt'],
-    'Expenses': ['ID', 'Date', 'Amount', 'Category', 'PaymentMethod', 'Notes', 'CreatedAt'],
-    'Savings': ['ID', 'Date', 'Amount', 'Type', 'Notes', 'CreatedAt'],
-    'Goals': ['ID', 'Name', 'TotalAmount', 'EmiAmount', 'TotalMonths', 'StartDate', 'PaidMonths', 'Notes', 'CreatedAt'],
-    'Budgets': ['ID', 'Month', 'Category', 'BudgetAmount', 'CreatedAt'],
-    'Recurring': ['ID', 'Type', 'Category', 'Amount', 'Frequency', 'NextDate', 'Description', 'Active', 'CreatedAt'],
+    'Income': ['ID', 'AccountId', 'Date', 'Amount', 'Source', 'Notes', 'CreatedAt'],
+    'Expenses': ['ID', 'AccountId', 'Date', 'Amount', 'Category', 'PaymentMethod', 'Notes', 'CreatedAt'],
+    'Savings': ['ID', 'AccountId', 'Date', 'Amount', 'Type', 'Notes', 'CreatedAt'],
+    'Goals': ['ID', 'AccountId', 'Name', 'TotalAmount', 'EmiAmount', 'TotalMonths', 'StartDate', 'PaidMonths', 'Notes', 'CreatedAt'],
+    'Budgets': ['ID', 'AccountId', 'Month', 'Category', 'BudgetAmount', 'CreatedAt'],
+    'Recurring': ['ID', 'AccountId', 'Type', 'Category', 'Amount', 'Frequency', 'NextDate', 'Description', 'Active', 'CreatedAt'],
     'Accounts': ['ID', 'Name', 'Emoji', 'Color', 'CreatedAt'],
   };
   
@@ -73,7 +73,7 @@ function setupSheets() {
   });
 }
 
-function loadAllData() {
+function loadAllData(accountId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const result = {};
   
@@ -88,14 +88,25 @@ function loadAllData() {
     const headers = data[0].map(function(h) { 
       // Handle 'ID' → 'id' correctly (not 'iD')
       if (h === 'ID') return 'id';
+      if (h === 'AccountId') return 'accountId';
       return h.charAt(0).toLowerCase() + h.slice(1); 
     });
     
+    // Find accountId column index
+    var accountIdCol = headers.indexOf('accountId');
+    
     const rows = [];
     for (var i = 1; i < data.length; i++) {
+      // Filter by accountId (skip if not matching, unless it's the Accounts sheet)
+      if (accountId && accountIdCol >= 0 && name !== 'Accounts') {
+        if (data[i][accountIdCol] !== accountId) continue;
+      }
+      
       var obj = {};
       var hasData = false;
       for (var j = 0; j < headers.length; j++) {
+        // Skip accountId from returned data (frontend doesn't need it)
+        if (headers[j] === 'accountId') continue;
         var cellVal = data[i][j];
         // Try to parse JSON strings back to arrays/objects
         if (typeof cellVal === 'string' && cellVal.length > 0 && (cellVal.charAt(0) === '[' || cellVal.charAt(0) === '{')) {
@@ -116,7 +127,7 @@ function loadAllData() {
   return jsonResponse(result);
 }
 
-function syncAllData(payload) {
+function syncAllData(payload, accountId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
   // First run setup if needed
@@ -129,33 +140,62 @@ function syncAllData(payload) {
     
     const items = payload[key];
     
-    // Clear existing data (keep headers)
+    // For Accounts sheet, no accountId tagging needed
+    if (sheetName === 'Accounts') {
+      if (sheet.getLastRow() > 1) {
+        sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clear();
+      }
+      if (!items || items.length === 0) return;
+      var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      var rows = items.map(function(item) {
+        return headers.map(function(h) {
+          var k = (h === 'ID') ? 'id' : h.charAt(0).toLowerCase() + h.slice(1);
+          var val = item[k] !== undefined ? item[k] : (item[h] !== undefined ? item[h] : '');
+          if (Array.isArray(val) || (typeof val === 'object' && val !== null)) return JSON.stringify(val);
+          return val;
+        });
+      });
+      if (rows.length > 0) sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      return;
+    }
+    
+    // For data sheets: remove only THIS account's rows, keep other accounts' data
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var accountIdCol = -1;
+    for (var h = 0; h < headers.length; h++) {
+      if (headers[h] === 'AccountId') { accountIdCol = h; break; }
+    }
+    
+    // Read existing data and keep rows from OTHER accounts
+    var otherRows = [];
     if (sheet.getLastRow() > 1) {
+      var allData = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+      for (var r = 0; r < allData.length; r++) {
+        if (accountIdCol >= 0 && allData[r][accountIdCol] !== accountId) {
+          otherRows.push(allData[r]);
+        }
+      }
       sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clear();
     }
     
-    // If no items, just leave it cleared
-    if (!items || items.length === 0) return;
-    
-    // Get headers
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    // Write data
-    var rows = items.map(function(item) {
-      return headers.map(function(h) {
-        // Handle 'ID' header → maps to item.id (lowercase)
-        var key = (h === 'ID') ? 'id' : h.charAt(0).toLowerCase() + h.slice(1);
-        var val = item[key] !== undefined ? item[key] : (item[h] !== undefined ? item[h] : '');
-        // Serialize arrays/objects as JSON strings for storage
-        if (Array.isArray(val) || (typeof val === 'object' && val !== null)) {
-          return JSON.stringify(val);
-        }
-        return val;
+    // Build new rows for this account
+    var newRows = [];
+    if (items && items.length > 0) {
+      newRows = items.map(function(item) {
+        return headers.map(function(h) {
+          if (h === 'AccountId') return accountId;
+          var k = (h === 'ID') ? 'id' : h.charAt(0).toLowerCase() + h.slice(1);
+          var val = item[k] !== undefined ? item[k] : (item[h] !== undefined ? item[h] : '');
+          if (Array.isArray(val) || (typeof val === 'object' && val !== null)) return JSON.stringify(val);
+          return val;
+        });
       });
-    });
+    }
     
-    if (rows.length > 0) {
-      sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+    // Write other accounts' data + this account's data
+    var combined = otherRows.concat(newRows);
+    if (combined.length > 0) {
+      sheet.getRange(2, 1, combined.length, headers.length).setValues(combined);
     }
   });
   
