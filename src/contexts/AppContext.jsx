@@ -131,50 +131,52 @@ export function AppProvider({ children }) {
 
   // --- Google Sheets Sync ---
   const syncTimeoutRef = useRef(null);
+  const pollIntervalRef = useRef(null);
+  const isSyncingRef = useRef(false);
 
-  // Load data from Google Sheets on mount (merges with localStorage)
+  // Load data from Google Sheets
+  const loadFromSheets = useCallback(async (showSyncing = true) => {
+    if (!googleSheetsService.isConfigured() || isSyncingRef.current) return;
+    try {
+      if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: true });
+      const sheetData = await googleSheetsService.loadAllData();
+
+      const payload = {
+        income: sheetData.income || [],
+        expenses: sheetData.expenses || [],
+        savings: sheetData.savings || [],
+        goals: sheetData.goals || [],
+        budgets: sheetData.budgets || [],
+        recurring: sheetData.recurring || [],
+      };
+
+      dispatch({ type: 'LOAD_ALL', payload });
+      dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
+
+      // Persist to localStorage for offline access
+      storage.setIncome(payload.income);
+      storage.setExpenses(payload.expenses);
+      storage.setSavings(payload.savings);
+      storage.setGoals(payload.goals);
+      storage.setBudgets(payload.budgets);
+      storage.setRecurring(payload.recurring);
+    } catch (err) {
+      console.error('Google Sheets load failed:', err.message);
+      dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: false });
+    } finally {
+      if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: false });
+    }
+  }, []);
+
+  // Load from Sheets on mount and poll every 30 seconds for cross-browser sync
   useEffect(() => {
     if (!googleSheetsService.isConfigured()) return;
-    let cancelled = false;
 
-    const loadFromSheets = async () => {
-      try {
-        dispatch({ type: 'SET_SYNCING', payload: true });
-        const sheetData = await googleSheetsService.loadAllData();
-        if (cancelled) return;
+    loadFromSheets(true);
+    pollIntervalRef.current = setInterval(() => loadFromSheets(false), 30000);
 
-        // Use sheet data if it has content; merge with local data
-        const merged = {
-          income: sheetData.income?.length ? sheetData.income : storage.getIncome(),
-          expenses: sheetData.expenses?.length ? sheetData.expenses : storage.getExpenses(),
-          savings: sheetData.savings?.length ? sheetData.savings : storage.getSavings(),
-          goals: sheetData.goals?.length ? sheetData.goals : storage.getGoals(),
-          budgets: sheetData.budgets?.length ? sheetData.budgets : storage.getBudgets(),
-          recurring: sheetData.recurring?.length ? sheetData.recurring : storage.getRecurring(),
-        };
-
-        dispatch({ type: 'LOAD_ALL', payload: merged });
-        dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
-
-        // Also persist sheet data to localStorage for offline access
-        storage.setIncome(merged.income);
-        storage.setExpenses(merged.expenses);
-        storage.setSavings(merged.savings);
-        storage.setGoals(merged.goals);
-        storage.setBudgets(merged.budgets);
-        storage.setRecurring(merged.recurring);
-      } catch (err) {
-        console.error('Google Sheets load failed (using localStorage):', err.message);
-        dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: false });
-        dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'warning', message: 'Could not load from Google Sheets: ' + err.message } });
-      } finally {
-        if (!cancelled) dispatch({ type: 'SET_SYNCING', payload: false });
-      }
-    };
-
-    loadFromSheets();
-    return () => { cancelled = true; };
-  }, [activeAccountId]);
+    return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
+  }, [activeAccountId, loadFromSheets]);
 
   // Sync to Google Sheets when data changes (debounced)
   useEffect(() => {
@@ -183,6 +185,7 @@ export function AppProvider({ children }) {
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     syncTimeoutRef.current = setTimeout(async () => {
       try {
+        isSyncingRef.current = true;
         dispatch({ type: 'SET_SYNCING', payload: true });
         await googleSheetsService.syncAllData({
           income: state.income,
@@ -197,6 +200,7 @@ export function AppProvider({ children }) {
         console.warn('Google Sheets sync failed:', err.message);
       } finally {
         dispatch({ type: 'SET_SYNCING', payload: false });
+        isSyncingRef.current = false;
       }
     }, 2000); // Debounce 2 seconds
 
