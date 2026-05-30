@@ -85,6 +85,8 @@ function loadAllData() {
     
     const data = sheet.getDataRange().getValues();
     const headers = data[0].map(function(h) { 
+      // Handle 'ID' → 'id' correctly (not 'iD')
+      if (h === 'ID') return 'id';
       return h.charAt(0).toLowerCase() + h.slice(1); 
     });
     
@@ -127,7 +129,8 @@ function syncAllData(payload) {
     // Write data
     var rows = items.map(function(item) {
       return headers.map(function(h) {
-        var key = h.charAt(0).toLowerCase() + h.slice(1);
+        // Handle 'ID' header → maps to item.id (lowercase)
+        var key = (h === 'ID') ? 'id' : h.charAt(0).toLowerCase() + h.slice(1);
         return item[key] !== undefined ? item[key] : (item[h] !== undefined ? item[h] : '');
       });
     });
@@ -147,7 +150,7 @@ function appendToSheet(sheetName, row) {
   
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const values = headers.map(function(h) {
-    var key = h.charAt(0).toLowerCase() + h.slice(1);
+    var key = (h === 'ID') ? 'id' : h.charAt(0).toLowerCase() + h.slice(1);
     return row[key] !== undefined ? row[key] : (row[h] !== undefined ? row[h] : '');
   });
   
@@ -174,7 +177,7 @@ function updateInSheet(sheetName, id, row) {
   
   const headers = data[0];
   const values = headers.map(function(h) {
-    var key = h.charAt(0).toLowerCase() + h.slice(1);
+    var key = (h === 'ID') ? 'id' : h.charAt(0).toLowerCase() + h.slice(1);
     return row[key] !== undefined ? row[key] : (row[h] !== undefined ? row[h] : '');
   });
   
