@@ -122,12 +122,14 @@ function syncAllData(payload) {
     if (!sheet) return;
     
     const items = payload[key];
-    if (!items || items.length === 0) return;
     
     // Clear existing data (keep headers)
     if (sheet.getLastRow() > 1) {
       sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clear();
     }
+    
+    // If no items, just leave it cleared
+    if (!items || items.length === 0) return;
     
     // Get headers
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];

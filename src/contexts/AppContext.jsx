@@ -133,13 +133,18 @@ export function AppProvider({ children }) {
   const syncTimeoutRef = useRef(null);
   const pollIntervalRef = useRef(null);
   const isSyncingRef = useRef(false);
+  const hasPendingChangesRef = useRef(false);
 
   // Load data from Google Sheets
   const loadFromSheets = useCallback(async (showSyncing = true) => {
-    if (!googleSheetsService.isConfigured() || isSyncingRef.current) return;
+    // Don't poll if we have pending local changes or an active sync
+    if (!googleSheetsService.isConfigured() || isSyncingRef.current || hasPendingChangesRef.current) return;
     try {
       if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: true });
       const sheetData = await googleSheetsService.loadAllData();
+
+      // Don't overwrite if local changes happened while we were fetching
+      if (hasPendingChangesRef.current || isSyncingRef.current) return;
 
       const payload = {
         income: sheetData.income || [],
@@ -150,6 +155,7 @@ export function AppProvider({ children }) {
         recurring: sheetData.recurring || [],
       };
 
+      loadedRef.current = false; // Prevent triggering sync from this load
       dispatch({ type: 'LOAD_ALL', payload });
       dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
 
@@ -160,6 +166,7 @@ export function AppProvider({ children }) {
       storage.setGoals(payload.goals);
       storage.setBudgets(payload.budgets);
       storage.setRecurring(payload.recurring);
+      setTimeout(() => { loadedRef.current = true; }, 0);
     } catch (err) {
       console.error('Google Sheets load failed:', err.message);
       dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: false });
@@ -182,6 +189,7 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (!loadedRef.current || !googleSheetsService.isConfigured()) return;
 
+    hasPendingChangesRef.current = true;
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     syncTimeoutRef.current = setTimeout(async () => {
       try {
@@ -201,6 +209,7 @@ export function AppProvider({ children }) {
       } finally {
         dispatch({ type: 'SET_SYNCING', payload: false });
         isSyncingRef.current = false;
+        hasPendingChangesRef.current = false;
       }
     }, 2000); // Debounce 2 seconds
 
