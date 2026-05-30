@@ -107,6 +107,8 @@ export function AppProvider({ children }) {
     accountRef.current = activeAccountId;
     localSaveRef.current = false;
     sheetSyncRef.current = false;
+    hasPendingChangesRef.current = false;
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     storage.setActiveAccount(activeAccountId);
     dispatch({
       type: 'LOAD_ALL',
@@ -161,17 +163,24 @@ export function AppProvider({ children }) {
         setAccountsFromSheet(sheetData.accounts);
       }
 
-      sheetSyncRef.current = false; // Prevent triggering sync from this load
-      dispatch({ type: 'LOAD_ALL', payload });
-      dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
+      // Only load sheet data if it actually has content, otherwise keep localStorage data
+      const hasSheetData = payload.income.length > 0 || payload.expenses.length > 0 ||
+        payload.savings.length > 0 || payload.goals.length > 0 ||
+        payload.budgets.length > 0 || payload.recurring.length > 0;
 
-      // Persist to localStorage for offline access
-      storage.setIncome(payload.income);
-      storage.setExpenses(payload.expenses);
-      storage.setSavings(payload.savings);
-      storage.setGoals(payload.goals);
-      storage.setBudgets(payload.budgets);
-      storage.setRecurring(payload.recurring);
+      if (hasSheetData) {
+        sheetSyncRef.current = false; // Prevent triggering sync from this load
+        dispatch({ type: 'LOAD_ALL', payload });
+        // Persist to localStorage for offline access
+        storage.setIncome(payload.income);
+        storage.setExpenses(payload.expenses);
+        storage.setSavings(payload.savings);
+        storage.setGoals(payload.goals);
+        storage.setBudgets(payload.budgets);
+        storage.setRecurring(payload.recurring);
+      }
+
+      dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
       setTimeout(() => { sheetSyncRef.current = true; }, 200);
     } catch (err) {
       console.error('Google Sheets load failed:', err.message);
@@ -242,7 +251,7 @@ export function AppProvider({ children }) {
     }, 2000); // Debounce 2 seconds
 
     return () => { if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current); };
-  }, [state.income, state.expenses, state.savings, state.goals, state.budgets, state.recurring, accounts]);
+  }, [state.income, state.expenses, state.savings, state.goals, state.budgets, state.recurring, accounts, activeAccountId]);
 
   // Process recurring transactions
   const processRecurring = useCallback(() => {
