@@ -32,6 +32,8 @@ function doPost(e) {
   const action = data.action;
   
   switch (action) {
+    case 'load':
+      return loadAllData();
     case 'sync':
       return syncAllData(data.payload);
     case 'append':
