@@ -106,28 +106,27 @@ export function AppProvider({ children }) {
 
       if (hasPendingChangesRef.current || isSyncingRef.current) return;
 
-      const payload = {
-        income: sheetData.income || [],
-        expenses: sheetData.expenses || [],
-        savings: sheetData.savings || [],
-        goals: sheetData.goals || [],
-        budgets: sheetData.budgets || [],
-        recurring: sheetData.recurring || [],
-      };
+      // Only use sheet data for a category if it has valid entries
+      // Goals must have emiAmount/totalAmount fields (guards against old sheet format)
+      const validGoals = (sheetData.goals || []).filter(g => g.totalAmount !== undefined && g.emiAmount !== undefined);
 
-      const hasSheetData = payload.income.length > 0 || payload.expenses.length > 0 ||
-        payload.savings.length > 0 || payload.goals.length > 0 ||
-        payload.budgets.length > 0 || payload.recurring.length > 0;
+      const payload = {};
+      if (sheetData.income?.length > 0) payload.income = sheetData.income;
+      if (sheetData.expenses?.length > 0) payload.expenses = sheetData.expenses;
+      if (sheetData.savings?.length > 0) payload.savings = sheetData.savings;
+      if (validGoals.length > 0) payload.goals = validGoals;
+      if (sheetData.budgets?.length > 0) payload.budgets = sheetData.budgets;
+      if (sheetData.recurring?.length > 0) payload.recurring = sheetData.recurring;
 
-      if (hasSheetData) {
+      if (Object.keys(payload).length > 0) {
         sheetSyncRef.current = false;
         dispatch({ type: 'LOAD_ALL', payload });
-        storage.setIncome(payload.income);
-        storage.setExpenses(payload.expenses);
-        storage.setSavings(payload.savings);
-        storage.setGoals(payload.goals);
-        storage.setBudgets(payload.budgets);
-        storage.setRecurring(payload.recurring);
+        if (payload.income) storage.setIncome(payload.income);
+        if (payload.expenses) storage.setExpenses(payload.expenses);
+        if (payload.savings) storage.setSavings(payload.savings);
+        if (payload.goals) storage.setGoals(payload.goals);
+        if (payload.budgets) storage.setBudgets(payload.budgets);
+        if (payload.recurring) storage.setRecurring(payload.recurring);
         localStorage.removeItem('sst_dirty');
       }
 

@@ -64,9 +64,19 @@ function setupSheets() {
     if (!sheet) {
       sheet = ss.insertSheet(name);
     }
+    var expectedHeaders = headers[name];
     if (sheet.getLastRow() === 0) {
-      sheet.appendRow(headers[name]);
-      sheet.getRange(1, 1, 1, headers[name].length).setFontWeight('bold');
+      sheet.appendRow(expectedHeaders);
+      sheet.getRange(1, 1, 1, expectedHeaders.length).setFontWeight('bold');
+    } else {
+      // Ensure headers match expected format (fix old sheets)
+      var currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      if (currentHeaders.join(',') !== expectedHeaders.join(',')) {
+        // Headers mismatch — clear sheet and write correct headers
+        sheet.clear();
+        sheet.appendRow(expectedHeaders);
+        sheet.getRange(1, 1, 1, expectedHeaders.length).setFontWeight('bold');
+      }
     }
   });
 }
