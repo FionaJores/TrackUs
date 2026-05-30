@@ -93,8 +93,14 @@ function loadAllData() {
     const rows = [];
     for (var i = 1; i < data.length; i++) {
       var obj = {};
+      var hasData = false;
       for (var j = 0; j < headers.length; j++) {
         obj[headers[j]] = data[i][j];
+        if (data[i][j] !== '' && headers[j] !== 'id') hasData = true;
+      }
+      // Generate an ID if missing but row has other data
+      if (!obj.id && hasData) {
+        obj.id = 'gs_' + Date.now().toString(36) + '_' + i;
       }
       if (obj.id) rows.push(obj);
     }
