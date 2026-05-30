@@ -73,15 +73,38 @@ function appReducer(state, action) {
 }
 
 export function AppProvider({ children }) {
-  const [state, dispatch] = useReducer(appReducer, initialState);
-  const [isLoaded, setIsLoaded] = React.useState(false);
   const { activeAccountId } = useAccount();
+  const loadedRef = React.useRef(false);
+  const accountRef = React.useRef(activeAccountId);
 
-  // Reload data when active account changes
-  useEffect(() => {
-    setIsLoaded(false);
+  // Initialize state from localStorage immediately
+  const getInitialState = () => {
     storage.setActiveAccount(activeAccountId);
     storage.migrateIfNeeded();
+    return {
+      ...initialState,
+      income: storage.getIncome(),
+      expenses: storage.getExpenses(),
+      savings: storage.getSavings(),
+      goals: storage.getGoals(),
+      budgets: storage.getBudgets(),
+      recurring: storage.getRecurring(),
+    };
+  };
+
+  const [state, dispatch] = useReducer(appReducer, null, getInitialState);
+
+  // Mark as loaded after first render
+  useEffect(() => {
+    loadedRef.current = true;
+  }, []);
+
+  // Reload data when active account changes (not on first mount)
+  useEffect(() => {
+    if (accountRef.current === activeAccountId) return;
+    accountRef.current = activeAccountId;
+    loadedRef.current = false;
+    storage.setActiveAccount(activeAccountId);
     dispatch({
       type: 'LOAD_ALL',
       payload: {
@@ -93,16 +116,17 @@ export function AppProvider({ children }) {
         recurring: storage.getRecurring(),
       }
     });
-    setIsLoaded(true);
+    // Use setTimeout to ensure state has updated before enabling saves
+    setTimeout(() => { loadedRef.current = true; }, 0);
   }, [activeAccountId]);
 
-  // Persist to localStorage on changes (only after initial load)
-  useEffect(() => { if (isLoaded) storage.setIncome(state.income); }, [state.income, isLoaded]);
-  useEffect(() => { if (isLoaded) storage.setExpenses(state.expenses); }, [state.expenses, isLoaded]);
-  useEffect(() => { if (isLoaded) storage.setSavings(state.savings); }, [state.savings, isLoaded]);
-  useEffect(() => { if (isLoaded) storage.setGoals(state.goals); }, [state.goals, isLoaded]);
-  useEffect(() => { if (isLoaded) storage.setBudgets(state.budgets); }, [state.budgets, isLoaded]);
-  useEffect(() => { if (isLoaded) storage.setRecurring(state.recurring); }, [state.recurring, isLoaded]);
+  // Persist to localStorage on changes (skip initial render)
+  useEffect(() => { if (loadedRef.current) storage.setIncome(state.income); }, [state.income]);
+  useEffect(() => { if (loadedRef.current) storage.setExpenses(state.expenses); }, [state.expenses]);
+  useEffect(() => { if (loadedRef.current) storage.setSavings(state.savings); }, [state.savings]);
+  useEffect(() => { if (loadedRef.current) storage.setGoals(state.goals); }, [state.goals]);
+  useEffect(() => { if (loadedRef.current) storage.setBudgets(state.budgets); }, [state.budgets]);
+  useEffect(() => { if (loadedRef.current) storage.setRecurring(state.recurring); }, [state.recurring]);
 
   // Process recurring transactions
   const processRecurring = useCallback(() => {
