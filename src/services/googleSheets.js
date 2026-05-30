@@ -27,19 +27,19 @@ export const googleSheetsService = {
     }
   },
 
-  async loadAllData(accountId) {
+  async loadAllData() {
     if (!this.isConfigured()) throw new Error('Apps Script URL not configured');
     return await this._fetch(this.getUrl(), {
       method: 'POST',
-      body: JSON.stringify({ action: 'load', accountId }),
+      body: JSON.stringify({ action: 'load' }),
     });
   },
 
-  async syncAllData(data, accountId) {
+  async syncAllData(data) {
     if (!this.isConfigured()) throw new Error('Apps Script URL not configured');
     return await this._fetch(this.getUrl(), {
       method: 'POST',
-      body: JSON.stringify({ action: 'sync', payload: data, accountId }),
+      body: JSON.stringify({ action: 'sync', payload: data }),
     });
   },
 
@@ -64,14 +64,6 @@ export const googleSheetsService = {
     await this._fetch(this.getUrl(), {
       method: 'POST',
       body: JSON.stringify({ action: 'delete', sheet: sheetName, id }),
-    });
-  },
-
-  async deleteAccount(accountId) {
-    if (!this.isConfigured()) return;
-    await this._fetch(this.getUrl(), {
-      method: 'POST',
-      body: JSON.stringify({ action: 'deleteAccount', accountId }),
     });
   },
 };

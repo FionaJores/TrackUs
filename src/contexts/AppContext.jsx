@@ -2,7 +2,6 @@ import React, { createContext, useContext, useReducer, useEffect, useCallback, u
 import storage from '../utils/storage';
 import { generateId } from '../utils/constants';
 import { addMonths, format, isBefore, parseISO } from 'date-fns';
-import { useAccount } from './AccountContext';
 import googleSheetsService from '../services/googleSheets';
 
 const AppContext = createContext();
@@ -21,52 +20,43 @@ const initialState = {
 
 function appReducer(state, action) {
   switch (action.type) {
-    // Income
     case 'SET_INCOME': return { ...state, income: action.payload };
     case 'ADD_INCOME': return { ...state, income: [...state.income, { ...action.payload, id: generateId(), createdAt: new Date().toISOString() }] };
     case 'UPDATE_INCOME': return { ...state, income: state.income.map(i => i.id === action.payload.id ? { ...i, ...action.payload } : i) };
     case 'DELETE_INCOME': return { ...state, income: state.income.filter(i => i.id !== action.payload) };
 
-    // Expenses
     case 'SET_EXPENSES': return { ...state, expenses: action.payload };
     case 'ADD_EXPENSE': return { ...state, expenses: [...state.expenses, { ...action.payload, id: generateId(), createdAt: new Date().toISOString() }] };
     case 'UPDATE_EXPENSE': return { ...state, expenses: state.expenses.map(e => e.id === action.payload.id ? { ...e, ...action.payload } : e) };
     case 'DELETE_EXPENSE': return { ...state, expenses: state.expenses.filter(e => e.id !== action.payload) };
 
-    // Savings
     case 'SET_SAVINGS': return { ...state, savings: action.payload };
     case 'ADD_SAVINGS': return { ...state, savings: [...state.savings, { ...action.payload, id: generateId(), createdAt: new Date().toISOString() }] };
     case 'UPDATE_SAVINGS': return { ...state, savings: state.savings.map(s => s.id === action.payload.id ? { ...s, ...action.payload } : s) };
     case 'DELETE_SAVINGS': return { ...state, savings: state.savings.filter(s => s.id !== action.payload) };
 
-    // Goals
     case 'SET_GOALS': return { ...state, goals: action.payload };
     case 'ADD_GOAL': return { ...state, goals: [...state.goals, { ...action.payload, id: generateId(), paidMonths: [], createdAt: new Date().toISOString() }] };
     case 'UPDATE_GOAL': return { ...state, goals: state.goals.map(g => g.id === action.payload.id ? { ...g, ...action.payload } : g) };
     case 'DELETE_GOAL': return { ...state, goals: state.goals.filter(g => g.id !== action.payload) };
 
-    // Budgets
     case 'SET_BUDGETS': return { ...state, budgets: action.payload };
     case 'ADD_BUDGET': return { ...state, budgets: [...state.budgets, { ...action.payload, id: generateId(), createdAt: new Date().toISOString() }] };
     case 'UPDATE_BUDGET': return { ...state, budgets: state.budgets.map(b => b.id === action.payload.id ? { ...b, ...action.payload } : b) };
     case 'DELETE_BUDGET': return { ...state, budgets: state.budgets.filter(b => b.id !== action.payload) };
 
-    // Recurring
     case 'SET_RECURRING': return { ...state, recurring: action.payload };
     case 'ADD_RECURRING': return { ...state, recurring: [...state.recurring, { ...action.payload, id: generateId(), active: true, createdAt: new Date().toISOString() }] };
     case 'UPDATE_RECURRING': return { ...state, recurring: state.recurring.map(r => r.id === action.payload.id ? { ...r, ...action.payload } : r) };
     case 'DELETE_RECURRING': return { ...state, recurring: state.recurring.filter(r => r.id !== action.payload) };
 
-    // Sync
     case 'SET_GOOGLE_CONNECTED': return { ...state, isGoogleConnected: action.payload };
     case 'SET_SYNCING': return { ...state, isSyncing: action.payload };
 
-    // Notifications
     case 'ADD_NOTIFICATION': return { ...state, notifications: [...state.notifications, { ...action.payload, id: generateId(), timestamp: new Date().toISOString() }] };
     case 'DISMISS_NOTIFICATION': return { ...state, notifications: state.notifications.filter(n => n.id !== action.payload) };
     case 'CLEAR_NOTIFICATIONS': return { ...state, notifications: [] };
 
-    // Load all
     case 'LOAD_ALL': return { ...state, ...action.payload };
 
     default: return state;
@@ -74,15 +64,18 @@ function appReducer(state, action) {
 }
 
 export function AppProvider({ children }) {
-  const { activeAccountId, accounts, setAccountsFromSheet } = useAccount();
-  const localSaveRef = React.useRef(false); // Controls localStorage saving
-  const sheetSyncRef = React.useRef(false); // Controls Google Sheets syncing (only after sheet load)
-  const accountRef = React.useRef(activeAccountId);
+  const sheetSyncRef = useRef(false);
+  const syncTimeoutRef = useRef(null);
+  const isSyncingRef = useRef(false);
+  const hasPendingChangesRef = useRef(false);
+  const lastSyncTimeRef = useRef(0);
 
-  // Initialize state from localStorage immediately
   const getInitialState = () => {
-    storage.setActiveAccount(activeAccountId);
     storage.migrateIfNeeded();
+    // Check if there are unsynced local changes from a previous session
+    if (localStorage.getItem('sst_dirty')) {
+      hasPendingChangesRef.current = true;
+    }
     return {
       ...initialState,
       income: storage.getIncome(),
@@ -96,60 +89,21 @@ export function AppProvider({ children }) {
 
   const [state, dispatch] = useReducer(appReducer, null, getInitialState);
 
-  // Enable localStorage saving after first render (always safe)
-  useEffect(() => {
-    localSaveRef.current = true;
-  }, []);
-
-  // Reload data when active account changes (not on first mount)
-  useEffect(() => {
-    if (accountRef.current === activeAccountId) return;
-    accountRef.current = activeAccountId;
-    localSaveRef.current = false;
-    sheetSyncRef.current = false;
-    hasPendingChangesRef.current = false;
-    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    storage.setActiveAccount(activeAccountId);
-    dispatch({
-      type: 'LOAD_ALL',
-      payload: {
-        income: storage.getIncome(),
-        expenses: storage.getExpenses(),
-        savings: storage.getSavings(),
-        goals: storage.getGoals(),
-        budgets: storage.getBudgets(),
-        recurring: storage.getRecurring(),
-      }
-    });
-    setTimeout(() => { localSaveRef.current = true; }, 0);
-  }, [activeAccountId]);
-
-  // Persist to localStorage on changes (always, after first render)
-  useEffect(() => { if (localSaveRef.current) storage.setIncome(state.income); }, [state.income]);
-  useEffect(() => { if (localSaveRef.current) storage.setExpenses(state.expenses); }, [state.expenses]);
-  useEffect(() => { if (localSaveRef.current) storage.setSavings(state.savings); }, [state.savings]);
-  useEffect(() => { if (localSaveRef.current) storage.setGoals(state.goals); }, [state.goals]);
-  useEffect(() => { if (localSaveRef.current) storage.setBudgets(state.budgets); }, [state.budgets]);
-  useEffect(() => { if (localSaveRef.current) storage.setRecurring(state.recurring); }, [state.recurring]);
+  // Persist to localStorage on changes and mark as dirty
+  useEffect(() => { storage.setIncome(state.income); localStorage.setItem('sst_dirty', '1'); }, [state.income]);
+  useEffect(() => { storage.setExpenses(state.expenses); localStorage.setItem('sst_dirty', '1'); }, [state.expenses]);
+  useEffect(() => { storage.setSavings(state.savings); localStorage.setItem('sst_dirty', '1'); }, [state.savings]);
+  useEffect(() => { storage.setGoals(state.goals); localStorage.setItem('sst_dirty', '1'); }, [state.goals]);
+  useEffect(() => { storage.setBudgets(state.budgets); localStorage.setItem('sst_dirty', '1'); }, [state.budgets]);
+  useEffect(() => { storage.setRecurring(state.recurring); localStorage.setItem('sst_dirty', '1'); }, [state.recurring]);
 
   // --- Google Sheets Sync ---
-  const syncTimeoutRef = useRef(null);
-  const isSyncingRef = useRef(false);
-  const hasPendingChangesRef = useRef(false);
-  const lastSyncTimeRef = useRef(0);
-
-  // Load data from Google Sheets
   const loadFromSheets = useCallback(async (showSyncing = true) => {
-    // Don't load if we have pending local changes or an active sync
     if (!googleSheetsService.isConfigured() || isSyncingRef.current || hasPendingChangesRef.current) return;
     try {
       if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: true });
-      const sheetData = await googleSheetsService.loadAllData(activeAccountId);
+      const sheetData = await googleSheetsService.loadAllData();
 
-      // Don't overwrite if account changed while we were fetching
-      if (accountRef.current !== activeAccountId) return;
-
-      // Don't overwrite if local changes happened while we were fetching
       if (hasPendingChangesRef.current || isSyncingRef.current) return;
 
       const payload = {
@@ -161,26 +115,20 @@ export function AppProvider({ children }) {
         recurring: sheetData.recurring || [],
       };
 
-      // Sync accounts from sheet (cross-browser)
-      if (sheetData.accounts && sheetData.accounts.length > 0) {
-        setAccountsFromSheet(sheetData.accounts);
-      }
-
-      // Only load sheet data if it actually has content, otherwise keep localStorage data
       const hasSheetData = payload.income.length > 0 || payload.expenses.length > 0 ||
         payload.savings.length > 0 || payload.goals.length > 0 ||
         payload.budgets.length > 0 || payload.recurring.length > 0;
 
       if (hasSheetData) {
-        sheetSyncRef.current = false; // Prevent triggering sync from this load
+        sheetSyncRef.current = false;
         dispatch({ type: 'LOAD_ALL', payload });
-        // Persist to localStorage for offline access
         storage.setIncome(payload.income);
         storage.setExpenses(payload.expenses);
         storage.setSavings(payload.savings);
         storage.setGoals(payload.goals);
         storage.setBudgets(payload.budgets);
         storage.setRecurring(payload.recurring);
+        localStorage.removeItem('sst_dirty');
       }
 
       dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
@@ -188,24 +136,27 @@ export function AppProvider({ children }) {
     } catch (err) {
       console.error('Google Sheets load failed:', err.message);
       dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: false });
-      // If sheet load fails, DON'T enable syncing (prevents stale data push)
     } finally {
       if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: false });
     }
-  }, [setAccountsFromSheet, activeAccountId]);
+  }, []);
 
-  // Load from Sheets on mount
+  // Load from Sheets on mount (or push local if dirty)
   useEffect(() => {
     if (!googleSheetsService.isConfigured()) return;
-    loadFromSheets(true);
-  }, [activeAccountId, loadFromSheets]);
+    if (hasPendingChangesRef.current) {
+      // Local has unsaved changes — push to sheet instead of pulling
+      sheetSyncRef.current = true;
+    } else {
+      loadFromSheets(true);
+    }
+  }, [loadFromSheets]);
 
-  // Refresh from Sheets when tab gets focus (cross-browser sync)
+  // Refresh from Sheets when tab gets focus
   useEffect(() => {
     if (!googleSheetsService.isConfigured()) return;
 
     const handleFocus = () => {
-      // Only reload if enough time has passed since last sync (5 seconds)
       if (Date.now() - lastSyncTimeRef.current > 5000) {
         loadFromSheets(false);
       }
@@ -241,22 +192,21 @@ export function AppProvider({ children }) {
           goals: state.goals,
           budgets: state.budgets,
           recurring: state.recurring,
-          accounts: accounts,
-        }, activeAccountId);
+        });
         dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
         hasPendingChangesRef.current = false;
+        localStorage.removeItem('sst_dirty');
         lastSyncTimeRef.current = Date.now();
       } catch (err) {
         console.warn('Google Sheets sync failed:', err.message);
-        // Keep hasPendingChangesRef true so poll won't overwrite local data
       } finally {
         dispatch({ type: 'SET_SYNCING', payload: false });
         isSyncingRef.current = false;
       }
-    }, 2000); // Debounce 2 seconds
+    }, 2000);
 
     return () => { if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current); };
-  }, [state.income, state.expenses, state.savings, state.goals, state.budgets, state.recurring, accounts, activeAccountId]);
+  }, [state.income, state.expenses, state.savings, state.goals, state.budgets, state.recurring]);
 
   // Process recurring transactions
   const processRecurring = useCallback(() => {
@@ -264,7 +214,6 @@ export function AppProvider({ children }) {
     state.recurring.filter(r => r.active).forEach(r => {
       const nextDate = parseISO(r.nextDate);
       if (isBefore(nextDate, today) || format(nextDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) {
-        // Create the transaction
         if (r.type === 'income') {
           dispatch({ type: 'ADD_INCOME', payload: { date: r.nextDate, amount: r.amount, source: r.category, notes: `Auto: ${r.description}` } });
         } else if (r.type === 'expense') {
@@ -273,10 +222,9 @@ export function AppProvider({ children }) {
           dispatch({ type: 'ADD_SAVINGS', payload: { date: r.nextDate, amount: r.amount, type: r.category, notes: `Auto: ${r.description}` } });
         }
 
-        // Update next date
         let newNextDate;
         switch (r.frequency) {
-          case 'Daily': newNextDate = format(addMonths(nextDate, 0), 'yyyy-MM-dd'); break;
+          case 'Daily': newNextDate = format(new Date(nextDate.getTime() + 86400000), 'yyyy-MM-dd'); break;
           case 'Weekly': newNextDate = format(new Date(nextDate.getTime() + 7 * 86400000), 'yyyy-MM-dd'); break;
           case 'Monthly': newNextDate = format(addMonths(nextDate, 1), 'yyyy-MM-dd'); break;
           case 'Quarterly': newNextDate = format(addMonths(nextDate, 3), 'yyyy-MM-dd'); break;
@@ -290,7 +238,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     processRecurring();
-  }, []); // Run once on mount
+  }, []);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>

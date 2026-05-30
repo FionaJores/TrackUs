@@ -1,27 +1,15 @@
 const STORAGE_KEYS = {
-  INCOME: 'income',
-  EXPENSES: 'expenses',
-  SAVINGS: 'savings',
-  GOALS: 'goals',
-  BUDGETS: 'budgets',
-  RECURRING: 'recurring',
-  SETTINGS: 'settings',
+  INCOME: 'sst_income',
+  EXPENSES: 'sst_expenses',
+  SAVINGS: 'sst_savings',
+  GOALS: 'sst_goals',
+  BUDGETS: 'sst_budgets',
+  RECURRING: 'sst_recurring',
+  SETTINGS: 'sst_settings',
   THEME: 'sst_theme',
 };
 
-// Account-scoped key: sst_{accountId}_{dataType}
-function scopedKey(key, accountId) {
-  return `sst_${accountId}_${key}`;
-}
-
-// Current active account ID for storage scoping
-let _activeAccountId = localStorage.getItem('sst_active_account') || 'default';
-
 export const storage = {
-  setActiveAccount(accountId) {
-    _activeAccountId = accountId;
-  },
-
   get(key) {
     try {
       const data = localStorage.getItem(key);
@@ -44,26 +32,26 @@ export const storage = {
     localStorage.removeItem(key);
   },
 
-  getIncome: () => storage.get(scopedKey(STORAGE_KEYS.INCOME, _activeAccountId)) || [],
-  setIncome: (data) => storage.set(scopedKey(STORAGE_KEYS.INCOME, _activeAccountId), data),
+  getIncome: () => storage.get(STORAGE_KEYS.INCOME) || [],
+  setIncome: (data) => storage.set(STORAGE_KEYS.INCOME, data),
 
-  getExpenses: () => storage.get(scopedKey(STORAGE_KEYS.EXPENSES, _activeAccountId)) || [],
-  setExpenses: (data) => storage.set(scopedKey(STORAGE_KEYS.EXPENSES, _activeAccountId), data),
+  getExpenses: () => storage.get(STORAGE_KEYS.EXPENSES) || [],
+  setExpenses: (data) => storage.set(STORAGE_KEYS.EXPENSES, data),
 
-  getSavings: () => storage.get(scopedKey(STORAGE_KEYS.SAVINGS, _activeAccountId)) || [],
-  setSavings: (data) => storage.set(scopedKey(STORAGE_KEYS.SAVINGS, _activeAccountId), data),
+  getSavings: () => storage.get(STORAGE_KEYS.SAVINGS) || [],
+  setSavings: (data) => storage.set(STORAGE_KEYS.SAVINGS, data),
 
-  getGoals: () => storage.get(scopedKey(STORAGE_KEYS.GOALS, _activeAccountId)) || [],
-  setGoals: (data) => storage.set(scopedKey(STORAGE_KEYS.GOALS, _activeAccountId), data),
+  getGoals: () => storage.get(STORAGE_KEYS.GOALS) || [],
+  setGoals: (data) => storage.set(STORAGE_KEYS.GOALS, data),
 
-  getBudgets: () => storage.get(scopedKey(STORAGE_KEYS.BUDGETS, _activeAccountId)) || [],
-  setBudgets: (data) => storage.set(scopedKey(STORAGE_KEYS.BUDGETS, _activeAccountId), data),
+  getBudgets: () => storage.get(STORAGE_KEYS.BUDGETS) || [],
+  setBudgets: (data) => storage.set(STORAGE_KEYS.BUDGETS, data),
 
-  getRecurring: () => storage.get(scopedKey(STORAGE_KEYS.RECURRING, _activeAccountId)) || [],
-  setRecurring: (data) => storage.set(scopedKey(STORAGE_KEYS.RECURRING, _activeAccountId), data),
+  getRecurring: () => storage.get(STORAGE_KEYS.RECURRING) || [],
+  setRecurring: (data) => storage.set(STORAGE_KEYS.RECURRING, data),
 
-  getSettings: () => storage.get(scopedKey(STORAGE_KEYS.SETTINGS, _activeAccountId)) || {},
-  setSettings: (data) => storage.set(scopedKey(STORAGE_KEYS.SETTINGS, _activeAccountId), data),
+  getSettings: () => storage.get(STORAGE_KEYS.SETTINGS) || {},
+  setSettings: (data) => storage.set(STORAGE_KEYS.SETTINGS, data),
 
   getTheme: () => storage.get(STORAGE_KEYS.THEME) || 'dark',
   setTheme: (theme) => storage.set(STORAGE_KEYS.THEME, theme),
@@ -92,29 +80,32 @@ export const storage = {
   },
 
   clearAll() {
-    const prefix = `sst_${_activeAccountId}_`;
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith(prefix)) localStorage.removeItem(key);
-    });
+    Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
   },
 
-  // Migrate old unscoped data to default account
   migrateIfNeeded() {
-    const OLD_KEYS = ['sst_income', 'sst_expenses', 'sst_savings', 'sst_goals', 'sst_budgets', 'sst_recurring', 'sst_settings'];
-    const DATA_KEYS = ['income', 'expenses', 'savings', 'goals', 'budgets', 'recurring', 'settings'];
-    let migrated = false;
-    OLD_KEYS.forEach((oldKey, i) => {
-      const data = localStorage.getItem(oldKey);
-      if (data) {
-        const newKey = scopedKey(DATA_KEYS[i], 'default');
-        if (!localStorage.getItem(newKey)) {
-          localStorage.setItem(newKey, data);
-        }
-        localStorage.removeItem(oldKey);
-        migrated = true;
+    const activeAccountId = localStorage.getItem('sst_active_account') || 'default';
+    const oldPrefix = `sst_${activeAccountId}_`;
+    const dataTypes = ['income', 'expenses', 'savings', 'goals', 'budgets', 'recurring', 'settings'];
+
+    dataTypes.forEach(type => {
+      const oldKey = `${oldPrefix}${type}`;
+      const newKey = `sst_${type}`;
+      const oldData = localStorage.getItem(oldKey);
+      if (oldData && !localStorage.getItem(newKey)) {
+        localStorage.setItem(newKey, oldData);
       }
     });
-    return migrated;
+
+    // Clean up old account keys
+    Object.keys(localStorage).forEach(key => {
+      if (key === 'sst_accounts' || key === 'sst_active_account') {
+        localStorage.removeItem(key);
+      }
+      if (key.match(/^sst_[a-z0-9]+_(?:income|expenses|savings|goals|budgets|recurring|settings)$/)) {
+        localStorage.removeItem(key);
+      }
+    });
   }
 };
 

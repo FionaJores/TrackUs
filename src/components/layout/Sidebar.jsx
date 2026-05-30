@@ -4,9 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, TrendingUp, TrendingDown, PiggyBank, Target,
   Calculator, RefreshCw, FileText, BarChart3, Calendar,
-  ChevronLeft, ChevronRight, X, Menu, Users
+  ChevronLeft, ChevronRight, X, Menu
 } from 'lucide-react';
-import AccountSwitcher from '../common/AccountSwitcher';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -19,7 +18,6 @@ const navItems = [
   { path: '/monthly-summary', label: 'Monthly Summary', icon: Calendar },
   { path: '/total-summary', label: 'Total Summary', icon: BarChart3 },
   { path: '/reports', label: 'Reports', icon: FileText },
-  { path: '/accounts', label: 'Accounts', icon: Users },
 ];
 
 export default function Sidebar({ isOpen, setIsOpen, isMobile }) {
@@ -73,11 +71,6 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }) {
               <X size={18} />
             </button>
           )}
-        </div>
-
-        {/* Account Switcher */}
-        <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
-          <AccountSwitcher collapsed={!isOpen && !isMobile} />
         </div>
 
         {/* Nav */}

@@ -1,14 +1,12 @@
 import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useApp } from '../../contexts/AppContext';
-import { useAccount } from '../../contexts/AccountContext';
 import { Moon, Sun, Menu, Cloud, CloudOff, Bell } from 'lucide-react';
 import googleSheetsService from '../../services/googleSheets';
 
 export default function Header({ onMenuClick }) {
   const { theme, toggleTheme } = useTheme();
   const { state, dispatch } = useApp();
-  const { activeAccount } = useAccount();
 
   const handleGoogleSync = async () => {
     if (!googleSheetsService.isConfigured()) {
@@ -43,19 +41,7 @@ export default function Header({ onMenuClick }) {
         <Menu size={20} className="text-gray-600 dark:text-gray-300" />
       </button>
 
-      <div className="flex-1 flex items-center gap-2 ml-2">
-        {activeAccount && (
-          <span className="hidden sm:flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-            <span
-              className="w-5 h-5 rounded flex items-center justify-center text-xs"
-              style={{ backgroundColor: activeAccount.color + '20' }}
-            >
-              {activeAccount.emoji}
-            </span>
-            {activeAccount.name}
-          </span>
-        )}
-      </div>
+      <div className="flex-1" />
 
       <div className="flex items-center gap-2">
         {/* Google Sync */}
