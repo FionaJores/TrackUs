@@ -95,9 +95,13 @@ export function AppProvider({ children }) {
 
   const [state, dispatch] = useReducer(appReducer, null, getInitialState);
 
-  // Mark as loaded after first render
+  // Don't mark as loaded until initial sheet load completes
+  // (prevents syncing stale localStorage data back to sheet)
   useEffect(() => {
-    loadedRef.current = true;
+    if (!googleSheetsService.isConfigured()) {
+      loadedRef.current = true;
+    }
+    // If Google Sheets is configured, loadFromSheets will set loadedRef after it completes
   }, []);
 
   // Reload data when active account changes (not on first mount)
@@ -166,10 +170,12 @@ export function AppProvider({ children }) {
       storage.setGoals(payload.goals);
       storage.setBudgets(payload.budgets);
       storage.setRecurring(payload.recurring);
-      setTimeout(() => { loadedRef.current = true; }, 100);
+      setTimeout(() => { loadedRef.current = true; }, 200);
     } catch (err) {
       console.error('Google Sheets load failed:', err.message);
       dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: false });
+      // If sheet load fails, enable syncing from localStorage
+      loadedRef.current = true;
     } finally {
       if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: false });
     }
