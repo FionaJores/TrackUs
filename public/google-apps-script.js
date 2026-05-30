@@ -14,7 +14,7 @@
 // 10. Paste it in src/config/google.js → APPS_SCRIPT_URL
 // ============================================
 
-const SHEET_NAMES = ['Income', 'Expenses', 'Savings', 'Goals', 'Budgets', 'Recurring'];
+const SHEET_NAMES = ['Income', 'Expenses', 'Savings', 'Goals', 'Budgets', 'Recurring', 'Accounts'];
 
 function doGet(e) {
   const action = e.parameter.action;
@@ -57,6 +57,7 @@ function setupSheets() {
     'Goals': ['ID', 'Name', 'TargetAmount', 'CurrentAmount', 'TargetDate', 'Category', 'Notes', 'CreatedAt'],
     'Budgets': ['ID', 'Month', 'Category', 'BudgetAmount', 'CreatedAt'],
     'Recurring': ['ID', 'Type', 'Category', 'Amount', 'Frequency', 'NextDate', 'Description', 'Active', 'CreatedAt'],
+    'Accounts': ['ID', 'Name', 'Emoji', 'Color', 'CreatedAt'],
   };
   
   SHEET_NAMES.forEach(function(name) {

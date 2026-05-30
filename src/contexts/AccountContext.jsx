@@ -103,6 +103,18 @@ export function AccountProvider({ children }) {
     }
   }, [accounts]);
 
+  // Replace all accounts from sheet data (cross-browser sync)
+  const setAccountsFromSheet = useCallback((sheetAccounts) => {
+    if (!sheetAccounts || sheetAccounts.length === 0) return;
+    setAccounts(sheetAccounts);
+    saveAccounts(sheetAccounts);
+    // If active account no longer exists, switch to first
+    if (!sheetAccounts.find(a => a.id === activeAccountId)) {
+      setActiveAccountId(sheetAccounts[0].id);
+      saveActiveAccountId(sheetAccounts[0].id);
+    }
+  }, [activeAccountId]);
+
   return (
     <AccountContext.Provider value={{
       accounts,
@@ -112,6 +124,7 @@ export function AccountProvider({ children }) {
       updateAccount,
       deleteAccount,
       switchAccount,
+      setAccountsFromSheet,
     }}>
       {children}
     </AccountContext.Provider>

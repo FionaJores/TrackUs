@@ -74,7 +74,7 @@ function appReducer(state, action) {
 }
 
 export function AppProvider({ children }) {
-  const { activeAccountId } = useAccount();
+  const { activeAccountId, accounts, setAccountsFromSheet } = useAccount();
   const localSaveRef = React.useRef(false); // Controls localStorage saving
   const sheetSyncRef = React.useRef(false); // Controls Google Sheets syncing (only after sheet load)
   const accountRef = React.useRef(activeAccountId);
@@ -156,6 +156,11 @@ export function AppProvider({ children }) {
         recurring: sheetData.recurring || [],
       };
 
+      // Sync accounts from sheet (cross-browser)
+      if (sheetData.accounts && sheetData.accounts.length > 0) {
+        setAccountsFromSheet(sheetData.accounts);
+      }
+
       sheetSyncRef.current = false; // Prevent triggering sync from this load
       dispatch({ type: 'LOAD_ALL', payload });
       dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
@@ -175,7 +180,7 @@ export function AppProvider({ children }) {
     } finally {
       if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: false });
     }
-  }, []);
+  }, [setAccountsFromSheet]);
 
   // Load from Sheets on mount
   useEffect(() => {
@@ -222,6 +227,7 @@ export function AppProvider({ children }) {
           goals: state.goals,
           budgets: state.budgets,
           recurring: state.recurring,
+          accounts: accounts,
         });
         dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
         hasPendingChangesRef.current = false;
@@ -236,7 +242,7 @@ export function AppProvider({ children }) {
     }, 2000); // Debounce 2 seconds
 
     return () => { if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current); };
-  }, [state.income, state.expenses, state.savings, state.goals, state.budgets, state.recurring]);
+  }, [state.income, state.expenses, state.savings, state.goals, state.budgets, state.recurring, accounts]);
 
   // Process recurring transactions
   const processRecurring = useCallback(() => {
