@@ -21,7 +21,7 @@ export default function App() {
     <ThemeProvider>
       <AccountProvider>
         <AppProvider>
-          <BrowserRouter>
+          <BrowserRouter basename="/TrackUs">
             <Routes>
               <Route path="/" element={<Layout />}>
                 <Route index element={<Dashboard />} />
