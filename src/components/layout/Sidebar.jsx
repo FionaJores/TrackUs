@@ -13,7 +13,7 @@ const navItems = [
   { path: '/income', label: 'Income', icon: TrendingUp },
   { path: '/expenses', label: 'Expenses', icon: TrendingDown },
   { path: '/savings', label: 'Savings', icon: PiggyBank },
-  { path: '/goals', label: 'Goals', icon: Target },
+  { path: '/goals', label: 'EMI', icon: Target },
   { path: '/budget', label: 'Budget', icon: Calculator },
   { path: '/recurring', label: 'Recurring', icon: RefreshCw },
   { path: '/monthly-summary', label: 'Monthly Summary', icon: Calendar },

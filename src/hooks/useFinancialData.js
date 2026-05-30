@@ -21,7 +21,7 @@ export function useFinancialData(month = null) {
     const monthTotalExpenses = sumAmounts(monthExpenses);
     const monthTotalSavings = sumAmounts(monthSavings);
 
-    const currentBalance = totalIncome - totalExpenses;
+    const currentBalance = totalIncome - totalExpenses - totalSavings;
     const monthSavingsRate = monthTotalIncome > 0 ? Math.round((monthTotalSavings / monthTotalIncome) * 100) : 0;
 
     const expensesByCategory = groupByCategory(monthExpenses, 'category');

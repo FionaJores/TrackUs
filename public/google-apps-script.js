@@ -54,7 +54,7 @@ function setupSheets() {
     'Income': ['ID', 'Date', 'Amount', 'Source', 'Notes', 'CreatedAt'],
     'Expenses': ['ID', 'Date', 'Amount', 'Category', 'PaymentMethod', 'Notes', 'CreatedAt'],
     'Savings': ['ID', 'Date', 'Amount', 'Type', 'Notes', 'CreatedAt'],
-    'Goals': ['ID', 'Name', 'TargetAmount', 'CurrentAmount', 'TargetDate', 'Category', 'Notes', 'CreatedAt'],
+    'Goals': ['ID', 'Name', 'TotalAmount', 'EmiAmount', 'TotalMonths', 'StartDate', 'PaidMonths', 'Notes', 'CreatedAt'],
     'Budgets': ['ID', 'Month', 'Category', 'BudgetAmount', 'CreatedAt'],
     'Recurring': ['ID', 'Type', 'Category', 'Amount', 'Frequency', 'NextDate', 'Description', 'Active', 'CreatedAt'],
     'Accounts': ['ID', 'Name', 'Emoji', 'Color', 'CreatedAt'],
@@ -96,7 +96,12 @@ function loadAllData() {
       var obj = {};
       var hasData = false;
       for (var j = 0; j < headers.length; j++) {
-        obj[headers[j]] = data[i][j];
+        var cellVal = data[i][j];
+        // Try to parse JSON strings back to arrays/objects
+        if (typeof cellVal === 'string' && cellVal.length > 0 && (cellVal.charAt(0) === '[' || cellVal.charAt(0) === '{')) {
+          try { cellVal = JSON.parse(cellVal); } catch(e) {}
+        }
+        obj[headers[j]] = cellVal;
         if (data[i][j] !== '' && headers[j] !== 'id') hasData = true;
       }
       // Generate an ID if missing but row has other data
@@ -140,7 +145,12 @@ function syncAllData(payload) {
       return headers.map(function(h) {
         // Handle 'ID' header → maps to item.id (lowercase)
         var key = (h === 'ID') ? 'id' : h.charAt(0).toLowerCase() + h.slice(1);
-        return item[key] !== undefined ? item[key] : (item[h] !== undefined ? item[h] : '');
+        var val = item[key] !== undefined ? item[key] : (item[h] !== undefined ? item[h] : '');
+        // Serialize arrays/objects as JSON strings for storage
+        if (Array.isArray(val) || (typeof val === 'object' && val !== null)) {
+          return JSON.stringify(val);
+        }
+        return val;
       });
     });
     

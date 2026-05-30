@@ -41,7 +41,7 @@ function appReducer(state, action) {
 
     // Goals
     case 'SET_GOALS': return { ...state, goals: action.payload };
-    case 'ADD_GOAL': return { ...state, goals: [...state.goals, { ...action.payload, id: generateId(), currentAmount: 0, createdAt: new Date().toISOString() }] };
+    case 'ADD_GOAL': return { ...state, goals: [...state.goals, { ...action.payload, id: generateId(), paidMonths: [], createdAt: new Date().toISOString() }] };
     case 'UPDATE_GOAL': return { ...state, goals: state.goals.map(g => g.id === action.payload.id ? { ...g, ...action.payload } : g) };
     case 'DELETE_GOAL': return { ...state, goals: state.goals.filter(g => g.id !== action.payload) };
 

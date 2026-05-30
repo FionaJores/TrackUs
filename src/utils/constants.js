@@ -3,7 +3,7 @@ export const INCOME_SOURCES = [
 ];
 
 export const EXPENSE_CATEGORIES = [
-  'Food', 'Travel', 'Rent', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Education', 'Other'
+  'Food', 'Travel', 'Rent', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Education', 'EMI', 'Other'
 ];
 
 export const SAVINGS_TYPES = [
