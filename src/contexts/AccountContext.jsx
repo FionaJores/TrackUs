@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import googleSheetsService from '../services/googleSheets';
 
 const AccountContext = createContext();
@@ -55,6 +55,7 @@ export function AccountProvider({ children }) {
   });
 
   const activeAccount = accounts.find(a => a.id === activeAccountId) || accounts[0];
+  const deletedIdsRef = useRef(new Set());
 
   const createAccount = useCallback((name, emoji = '💼', color = null) => {
     const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -89,6 +90,9 @@ export function AccountProvider({ children }) {
       if (key.startsWith(prefix)) localStorage.removeItem(key);
     });
 
+    // Track deletion so sheet sync won't re-add it
+    deletedIdsRef.current.add(id);
+
     // Remove from Google Sheets
     googleSheetsService.deleteAccount(id).catch(() => {});
 
@@ -110,12 +114,15 @@ export function AccountProvider({ children }) {
   // Replace all accounts from sheet data (cross-browser sync)
   const setAccountsFromSheet = useCallback((sheetAccounts) => {
     if (!sheetAccounts || sheetAccounts.length === 0) return;
-    setAccounts(sheetAccounts);
-    saveAccounts(sheetAccounts);
+    // Filter out accounts that were recently deleted locally
+    const filtered = sheetAccounts.filter(a => !deletedIdsRef.current.has(a.id));
+    if (filtered.length === 0) return;
+    setAccounts(filtered);
+    saveAccounts(filtered);
     // If active account no longer exists, switch to first
-    if (!sheetAccounts.find(a => a.id === activeAccountId)) {
-      setActiveAccountId(sheetAccounts[0].id);
-      saveActiveAccountId(sheetAccounts[0].id);
+    if (!filtered.find(a => a.id === activeAccountId)) {
+      setActiveAccountId(filtered[0].id);
+      saveActiveAccountId(filtered[0].id);
     }
   }, [activeAccountId]);
 
