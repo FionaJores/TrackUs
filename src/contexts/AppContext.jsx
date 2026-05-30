@@ -146,6 +146,9 @@ export function AppProvider({ children }) {
       if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: true });
       const sheetData = await googleSheetsService.loadAllData(activeAccountId);
 
+      // Don't overwrite if account changed while we were fetching
+      if (accountRef.current !== activeAccountId) return;
+
       // Don't overwrite if local changes happened while we were fetching
       if (hasPendingChangesRef.current || isSyncingRef.current) return;
 
@@ -208,14 +211,16 @@ export function AppProvider({ children }) {
       }
     };
 
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', () => {
+    const handleVisibility = () => {
       if (document.visibilityState === 'visible') handleFocus();
-    });
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [loadFromSheets]);
 

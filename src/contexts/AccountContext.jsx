@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import googleSheetsService from '../services/googleSheets';
 
 const AccountContext = createContext();
 
@@ -87,6 +88,9 @@ export function AccountProvider({ children }) {
     Object.keys(localStorage).forEach(key => {
       if (key.startsWith(prefix)) localStorage.removeItem(key);
     });
+
+    // Remove from Google Sheets
+    googleSheetsService.deleteAccount(id).catch(() => {});
 
     if (activeAccountId === id) {
       const newActiveId = updated[0].id;

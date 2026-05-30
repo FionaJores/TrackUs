@@ -66,6 +66,14 @@ export const googleSheetsService = {
       body: JSON.stringify({ action: 'delete', sheet: sheetName, id }),
     });
   },
+
+  async deleteAccount(accountId) {
+    if (!this.isConfigured()) return;
+    await this._fetch(this.getUrl(), {
+      method: 'POST',
+      body: JSON.stringify({ action: 'deleteAccount', accountId }),
+    });
+  },
 };
 
 export default googleSheetsService;

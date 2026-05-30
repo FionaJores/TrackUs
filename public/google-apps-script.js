@@ -36,6 +36,8 @@ function doPost(e) {
       return loadAllData(data.accountId);
     case 'sync':
       return syncAllData(data.payload, data.accountId);
+    case 'deleteAccount':
+      return deleteAccountData(data.accountId);
     case 'append':
       return appendToSheet(data.sheet, data.row);
     case 'update':
@@ -259,6 +261,53 @@ function deleteFromSheet(sheetName, id) {
   }
   
   return jsonResponse({ error: 'Row not found' });
+}
+
+function deleteAccountData(accountId) {
+  if (!accountId) return jsonResponse({ error: 'No accountId provided' });
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Remove account from Accounts sheet
+  var accountsSheet = ss.getSheetByName('Accounts');
+  if (accountsSheet && accountsSheet.getLastRow() > 1) {
+    var data = accountsSheet.getDataRange().getValues();
+    for (var i = data.length - 1; i >= 1; i--) {
+      if (data[i][0] === accountId) {
+        accountsSheet.deleteRow(i + 1);
+      }
+    }
+  }
+  
+  // Remove all data rows belonging to this account from every data sheet
+  var dataSheets = ['Income', 'Expenses', 'Savings', 'Goals', 'Budgets', 'Recurring'];
+  dataSheets.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet || sheet.getLastRow() <= 1) return;
+    
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var accountIdCol = -1;
+    for (var h = 0; h < headers.length; h++) {
+      if (headers[h] === 'AccountId') { accountIdCol = h; break; }
+    }
+    if (accountIdCol === -1) return;
+    
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    var rowsToKeep = [];
+    for (var r = 0; r < data.length; r++) {
+      if (data[r][accountIdCol] !== accountId) {
+        rowsToKeep.push(data[r]);
+      }
+    }
+    
+    // Clear all data rows and rewrite kept rows
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clear();
+    if (rowsToKeep.length > 0) {
+      sheet.getRange(2, 1, rowsToKeep.length, headers.length).setValues(rowsToKeep);
+    }
+  });
+  
+  return jsonResponse({ status: 'account_deleted', accountId: accountId });
 }
 
 function jsonResponse(data) {
