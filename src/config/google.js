@@ -6,7 +6,7 @@
 // 4. Click Deploy → New Deployment → Web App → set access to "Anyone"
 // 5. Copy the URL and paste it below
 export const GOOGLE_CONFIG = {
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyObtI3yL_k7KAGjKf9Wn1F9_VUYaX0rso55tSObP_r9yZJ3Wsa8Q7s0wHxtcsn6pHP/exec', // Paste your deployed Apps Script URL here
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbydK6Cyhpds9zgO-DLjTaz_Zmg-_WNY3G3yhChedF7wFSmRQE9i1Uh6MsiNj_q8Ae6d/exec',
 };
 
 export const SHEET_NAMES = {
