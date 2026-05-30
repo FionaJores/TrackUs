@@ -75,7 +75,8 @@ function appReducer(state, action) {
 
 export function AppProvider({ children }) {
   const { activeAccountId } = useAccount();
-  const loadedRef = React.useRef(false);
+  const localSaveRef = React.useRef(false); // Controls localStorage saving
+  const sheetSyncRef = React.useRef(false); // Controls Google Sheets syncing (only after sheet load)
   const accountRef = React.useRef(activeAccountId);
 
   // Initialize state from localStorage immediately
@@ -95,20 +96,17 @@ export function AppProvider({ children }) {
 
   const [state, dispatch] = useReducer(appReducer, null, getInitialState);
 
-  // Don't mark as loaded until initial sheet load completes
-  // (prevents syncing stale localStorage data back to sheet)
+  // Enable localStorage saving after first render (always safe)
   useEffect(() => {
-    if (!googleSheetsService.isConfigured()) {
-      loadedRef.current = true;
-    }
-    // If Google Sheets is configured, loadFromSheets will set loadedRef after it completes
+    localSaveRef.current = true;
   }, []);
 
   // Reload data when active account changes (not on first mount)
   useEffect(() => {
     if (accountRef.current === activeAccountId) return;
     accountRef.current = activeAccountId;
-    loadedRef.current = false;
+    localSaveRef.current = false;
+    sheetSyncRef.current = false;
     storage.setActiveAccount(activeAccountId);
     dispatch({
       type: 'LOAD_ALL',
@@ -121,17 +119,16 @@ export function AppProvider({ children }) {
         recurring: storage.getRecurring(),
       }
     });
-    // Use setTimeout to ensure state has updated before enabling saves
-    setTimeout(() => { loadedRef.current = true; }, 0);
+    setTimeout(() => { localSaveRef.current = true; }, 0);
   }, [activeAccountId]);
 
-  // Persist to localStorage on changes (skip initial render)
-  useEffect(() => { if (loadedRef.current) storage.setIncome(state.income); }, [state.income]);
-  useEffect(() => { if (loadedRef.current) storage.setExpenses(state.expenses); }, [state.expenses]);
-  useEffect(() => { if (loadedRef.current) storage.setSavings(state.savings); }, [state.savings]);
-  useEffect(() => { if (loadedRef.current) storage.setGoals(state.goals); }, [state.goals]);
-  useEffect(() => { if (loadedRef.current) storage.setBudgets(state.budgets); }, [state.budgets]);
-  useEffect(() => { if (loadedRef.current) storage.setRecurring(state.recurring); }, [state.recurring]);
+  // Persist to localStorage on changes (always, after first render)
+  useEffect(() => { if (localSaveRef.current) storage.setIncome(state.income); }, [state.income]);
+  useEffect(() => { if (localSaveRef.current) storage.setExpenses(state.expenses); }, [state.expenses]);
+  useEffect(() => { if (localSaveRef.current) storage.setSavings(state.savings); }, [state.savings]);
+  useEffect(() => { if (localSaveRef.current) storage.setGoals(state.goals); }, [state.goals]);
+  useEffect(() => { if (localSaveRef.current) storage.setBudgets(state.budgets); }, [state.budgets]);
+  useEffect(() => { if (localSaveRef.current) storage.setRecurring(state.recurring); }, [state.recurring]);
 
   // --- Google Sheets Sync ---
   const syncTimeoutRef = useRef(null);
@@ -159,7 +156,7 @@ export function AppProvider({ children }) {
         recurring: sheetData.recurring || [],
       };
 
-      loadedRef.current = false; // Prevent triggering sync from this load
+      sheetSyncRef.current = false; // Prevent triggering sync from this load
       dispatch({ type: 'LOAD_ALL', payload });
       dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: true });
 
@@ -170,12 +167,11 @@ export function AppProvider({ children }) {
       storage.setGoals(payload.goals);
       storage.setBudgets(payload.budgets);
       storage.setRecurring(payload.recurring);
-      setTimeout(() => { loadedRef.current = true; }, 200);
+      setTimeout(() => { sheetSyncRef.current = true; }, 200);
     } catch (err) {
       console.error('Google Sheets load failed:', err.message);
       dispatch({ type: 'SET_GOOGLE_CONNECTED', payload: false });
-      // If sheet load fails, enable syncing from localStorage
-      loadedRef.current = true;
+      // If sheet load fails, DON'T enable syncing (prevents stale data push)
     } finally {
       if (showSyncing) dispatch({ type: 'SET_SYNCING', payload: false });
     }
@@ -211,7 +207,7 @@ export function AppProvider({ children }) {
 
   // Sync to Google Sheets when data changes (debounced)
   useEffect(() => {
-    if (!loadedRef.current || !googleSheetsService.isConfigured()) return;
+    if (!sheetSyncRef.current || !googleSheetsService.isConfigured()) return;
 
     hasPendingChangesRef.current = true;
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
